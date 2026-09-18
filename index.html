@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Football Sideline Snap Tracker</title>
+
   <style>
     :root {
       --bg: #0f172a;
@@ -15,7 +16,6 @@
       --accent-hover: #1d4ed8;
       --red: #ef4444;
       --green: #22c55e;
-      --light-green: #15803d;
     }
 
     * {
@@ -95,21 +95,28 @@
     }
 
     .action-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
       margin-bottom: 12px;
-      gap: 10px;
     }
 
     .btn-secondary {
       background: #334155;
       color: #fff;
       border: none;
-      padding: 8px 12px;
+      padding: 10px 8px;
       border-radius: 6px;
       font-size: 0.8rem;
       cursor: pointer;
+    }
+
+    .btn-save {
+      background: #15803d;
+    }
+
+    .btn-email {
+      background: #7c3aed;
     }
 
     .roster-header {
@@ -163,7 +170,6 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      transition: color 0.2s ease;
     }
 
     .player-name.status-red {
@@ -206,6 +212,14 @@
       color: var(--green);
     }
 
+    .save-status {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      margin-bottom: 10px;
+      min-height: 18px;
+    }
+
     .sticky-footer {
       position: fixed;
       bottom: 0;
@@ -230,7 +244,6 @@
       font-size: 1.1rem;
       font-weight: bold;
       cursor: pointer;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
     }
 
     .btn-record:active {
@@ -239,12 +252,16 @@
     }
   </style>
 </head>
+
 <body>
 
 <div class="container">
+
   <header>
     <h1>🏈 Sideline Snap Counter</h1>
+
     <div class="controls-grid">
+
       <div class="control-group">
         <label for="leagueSelect">League Rule</label>
         <select id="leagueSelect" onchange="updateUI()">
@@ -262,17 +279,41 @@
           <option value="Q4">Q4 (2nd Half)</option>
         </select>
       </div>
+
     </div>
 
-    <div class="rules-banner" id="ruleBanner">
-      Goal: 6 plays required in 1st Half
-    </div>
+    <div class="rules-banner" id="ruleBanner"></div>
   </header>
 
   <div class="action-bar">
-    <button class="btn-secondary" onclick="toggleSelectAll()">Check / Uncheck All</button>
-    <button class="btn-secondary" onclick="resetAll()">Reset Game</button>
+
+    <button
+      class="btn-secondary"
+      onclick="toggleSelectAll()">
+      Check / Uncheck All
+    </button>
+
+    <button
+      class="btn-secondary btn-save"
+      onclick="saveGame(true)">
+      💾 Save Game
+    </button>
+
+    <button
+      class="btn-secondary btn-email"
+      onclick="emailGame()">
+      ✉️ Email Game Report
+    </button>
+
+    <button
+      class="btn-secondary"
+      onclick="resetAll()">
+      Reset Game
+    </button>
+
   </div>
+
+  <div class="save-status" id="saveStatus"></div>
 
   <div class="roster-header">
     <div>ON</div>
@@ -285,126 +326,541 @@
   </div>
 
   <div class="player-list" id="playerList"></div>
+
 </div>
 
 <div class="sticky-footer">
-  <button class="btn-record" onclick="recordSnap()">RECORD SNAP FOR SELECTED</button>
+  <button class="btn-record" onclick="recordSnap()">
+    RECORD SNAP FOR SELECTED
+  </button>
 </div>
 
+
 <script>
-  const rosterData = [
-    { num: 1, name: "Ryker Conover" },
-    { num: 2, name: "Cooper Villalobos" },
-    { num: 3, name: "Caeser Johnson" },
-    { num: 4, name: "Bryce Anderson" },
-    { num: 5, name: "James Keller" },
-    { num: 6, name: "Rowyan Colleran" },
-    { num: 7, name: "Jordan Cook" },
-    { num: 9, name: "McCoy Kvasnicka" },
-    { num: 10, name: "Jackson Mitton" },
-    { num: 12, name: "Thomas Hale" },
-    { num: 13, name: "Graham Sanders" },
-    { num: 14, name: "Mason Kons" },
-    { num: 17, name: "Gulian Guerrero" },
-    { num: 20, name: "Jhett Barthlome" },
-    { num: 21, name: "Greyson Puckett" },
-    { num: 22, name: "Carson Trammell" },
-    { num: 23, name: "Morgan Chatterton" },
-    { num: 28, name: "Abe Guerrero" }
-  ];
 
-  let players = rosterData.map(p => ({
-    ...p,
-    onField: false,
-    q1: 0,
-    q2: 0,
-    q3: 0,
-    q4: 0
-  }));
+const rosterData = [
+  { num: 1, name: "Ryker Conover" },
+  { num: 2, name: "Cooper Villalobos" },
+  { num: 3, name: "Caeser Johnson" },
+  { num: 4, name: "Bryce Anderson" },
+  { num: 5, name: "James Keller" },
+  { num: 6, name: "Rowyan Colleran" },
+  { num: 7, name: "Jordan Cook" },
+  { num: 9, name: "McCoy Kvasnicka" },
+  { num: 10, name: "Jackson Mitton" },
+  { num: 12, name: "Thomas Hale" },
+  { num: 13, name: "Graham Sanders" },
+  { num: 14, name: "Mason Kons" },
+  { num: 17, name: "Gulian Guerrero" },
+  { num: 20, name: "Jhett Barthlome" },
+  { num: 21, name: "Greyson Puckett" },
+  { num: 22, name: "Carson Trammell" },
+  { num: 23, name: "Morgan Chatterton" },
+  { num: 28, name: "Abe Guerrero" }
+];
 
-  function init() {
-    render();
+
+let players = rosterData.map(p => ({
+  ...p,
+  onField: false,
+  q1: 0,
+  q2: 0,
+  q3: 0,
+  q4: 0
+}));
+
+
+/* -----------------------------
+   START APP
+----------------------------- */
+
+function init() {
+
+  loadGame();
+
+  render();
+
+}
+
+
+/* -----------------------------
+   RENDER PLAYER LIST
+----------------------------- */
+
+function render() {
+
+  const list = document.getElementById("playerList");
+
+  const currentQ =
+    document.getElementById("quarterSelect").value;
+
+  const league =
+    document.getElementById("leagueSelect").value;
+
+  const isFirstHalf =
+    currentQ === "Q1" || currentQ === "Q2";
+
+
+  let target = 6;
+
+  if (!isFirstHalf) {
+    target = league === "AA" ? 4 : 6;
   }
 
-  function render() {
-    const list = document.getElementById("playerList");
-    const currentQ = document.getElementById("quarterSelect").value;
-    const league = document.getElementById("leagueSelect").value;
-    const isFirstHalf = (currentQ === "Q1" || currentQ === "Q2");
-    
-    // Determine play target for current half
-    let target = 6;
-    if (!isFirstHalf) {
-      target = (league === "AA") ? 4 : 6;
+
+  document.getElementById("ruleBanner").innerText =
+    `Current Requirement: ${target} plays in ${
+      isFirstHalf ? "1st" : "2nd"
+    } Half`;
+
+
+  list.innerHTML = "";
+
+
+  players.forEach((p, index) => {
+
+    const halfTotal =
+      isFirstHalf
+        ? p.q1 + p.q2
+        : p.q3 + p.q4;
+
+
+    const isMet =
+      halfTotal >= target;
+
+
+    const statusClass =
+      isMet
+        ? "status-green"
+        : "status-red";
+
+
+    const card =
+      document.createElement("div");
+
+
+    card.className =
+      "player-card";
+
+
+    card.innerHTML = `
+
+      <div class="field-toggle">
+
+        <input
+          type="checkbox"
+          ${p.onField ? "checked" : ""}
+          onchange="toggleField(${index})"
+        >
+
+      </div>
+
+
+      <div class="player-name ${statusClass}">
+        #${p.num} ${p.name}
+      </div>
+
+
+      <div class="q-cell ${
+        currentQ === "Q1"
+          ? "active-q"
+          : ""
+      }">
+        ${p.q1}
+      </div>
+
+
+      <div class="q-cell ${
+        currentQ === "Q2"
+          ? "active-q"
+          : ""
+      }">
+        ${p.q2}
+      </div>
+
+
+      <div class="q-cell ${
+        currentQ === "Q3"
+          ? "active-q"
+          : ""
+      }">
+        ${p.q3}
+      </div>
+
+
+      <div class="q-cell ${
+        currentQ === "Q4"
+          ? "active-q"
+          : ""
+      }">
+        ${p.q4}
+      </div>
+
+
+      <div class="total-cell ${statusClass}">
+        ${halfTotal}
+      </div>
+
+    `;
+
+
+    list.appendChild(card);
+
+  });
+
+}
+
+
+/* -----------------------------
+   PLAYER FIELD SELECTION
+----------------------------- */
+
+function toggleField(index) {
+
+  players[index].onField =
+    !players[index].onField;
+
+  saveGame(false);
+
+}
+
+
+/* -----------------------------
+   RECORD SNAP
+----------------------------- */
+
+function recordSnap() {
+
+  const currentQ =
+    document
+      .getElementById("quarterSelect")
+      .value
+      .toLowerCase();
+
+
+  players.forEach(p => {
+
+    if (p.onField) {
+
+      p[currentQ] += 1;
+
     }
 
-    document.getElementById("ruleBanner").innerText = 
-      `Current Requirement: ${target} plays in ${isFirstHalf ? "1st" : "2nd"} Half`;
+  });
 
-    list.innerHTML = "";
 
-    players.forEach((p, index) => {
-      const halfTotal = isFirstHalf ? (p.q1 + p.q2) : (p.q3 + p.q4);
-      const isMet = halfTotal >= target;
-      const statusClass = isMet ? "status-green" : "status-red";
+  saveGame(false);
 
-      const card = document.createElement("div");
-      card.className = "player-card";
-      card.innerHTML = `
-        <div class="field-toggle">
-          <input type="checkbox" ${p.onField ? "checked" : ""} onchange="toggleField(${index})">
-        </div>
-        <div class="player-name ${statusClass}">
-          #${p.num} ${p.name}
-        </div>
-        <div class="q-cell ${currentQ === 'Q1' ? 'active-q' : ''}">${p.q1}</div>
-        <div class="q-cell ${currentQ === 'Q2' ? 'active-q' : ''}">${p.q2}</div>
-        <div class="q-cell ${currentQ === 'Q3' ? 'active-q' : ''}">${p.q3}</div>
-        <div class="q-cell ${currentQ === 'Q4' ? 'active-q' : ''}">${p.q4}</div>
-        <div class="total-cell ${statusClass}">${halfTotal}</div>
-      `;
-      list.appendChild(card);
-    });
-  }
+  render();
 
-  function toggleField(index) {
-    players[index].onField = !players[index].onField;
-  }
+}
 
-  function recordSnap() {
-    const currentQ = document.getElementById("quarterSelect").value.toLowerCase();
-    players.forEach(p => {
-      if (p.onField) {
-        p[currentQ] += 1;
-      }
-    });
-    render();
-  }
 
-  function toggleSelectAll() {
-    const hasUnchecked = players.some(p => !p.onField);
-    players.forEach(p => p.onField = hasUnchecked);
-    render();
-  }
+/* -----------------------------
+   SELECT ALL
+----------------------------- */
 
-  function updateUI() {
-    render();
-  }
+function toggleSelectAll() {
 
-  function resetAll() {
-    if (confirm("Are you sure you want to reset all play counts to zero?")) {
-      players.forEach(p => {
-        p.onField = false;
-        p.q1 = 0;
-        p.q2 = 0;
-        p.q3 = 0;
-        p.q4 = 0;
+  const hasUnchecked =
+    players.some(p => !p.onField);
+
+
+  players.forEach(p => {
+
+    p.onField = hasUnchecked;
+
+  });
+
+
+  saveGame(false);
+
+  render();
+
+}
+
+
+/* -----------------------------
+   QUARTER / LEAGUE CHANGE
+----------------------------- */
+
+function updateUI() {
+
+  saveGame(false);
+
+  render();
+
+}
+
+
+/* -----------------------------
+   SAVE GAME
+----------------------------- */
+
+function saveGame(showMessage = false) {
+
+  const gameData = {
+
+    players: players,
+
+    league:
+      document
+        .getElementById("leagueSelect")
+        .value,
+
+    quarter:
+      document
+        .getElementById("quarterSelect")
+        .value,
+
+    lastSaved:
+      new Date().toISOString()
+
+  };
+
+
+  localStorage.setItem(
+    "footballSnapTracker",
+    JSON.stringify(gameData)
+  );
+
+
+  if (showMessage) {
+
+    const now =
+      new Date().toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit"
       });
-      render();
-    }
+
+
+    document.getElementById("saveStatus").innerText =
+      "✓ Game saved at " + now;
+
+
+    setTimeout(() => {
+
+      document.getElementById("saveStatus").innerText = "";
+
+    }, 3000);
+
   }
 
-  init();
+}
+
+
+/* -----------------------------
+   LOAD SAVED GAME
+----------------------------- */
+
+function loadGame() {
+
+  const saved =
+    localStorage.getItem(
+      "footballSnapTracker"
+    );
+
+
+  if (!saved) return;
+
+
+  try {
+
+    const gameData =
+      JSON.parse(saved);
+
+
+    if (gameData.players) {
+
+      players =
+        gameData.players;
+
+    }
+
+
+    if (gameData.league) {
+
+      document
+        .getElementById("leagueSelect")
+        .value =
+        gameData.league;
+
+    }
+
+
+    if (gameData.quarter) {
+
+      document
+        .getElementById("quarterSelect")
+        .value =
+        gameData.quarter;
+
+    }
+
+  }
+
+  catch (error) {
+
+    console.error(
+      "Could not load game.",
+      error
+    );
+
+  }
+
+}
+
+
+/* -----------------------------
+   EMAIL GAME REPORT
+----------------------------- */
+
+function emailGame() {
+
+  saveGame(false);
+
+
+  const league =
+    document
+      .getElementById("leagueSelect")
+      .value;
+
+
+  const date =
+    new Date().toLocaleString();
+
+
+  const secondHalfTarget =
+    league === "AA"
+      ? 4
+      : 6;
+
+
+  let report =
+
+`FOOTBALL SIDELINE SNAP REPORT
+
+Date: ${date}
+
+League: ${
+  league === "AA"
+    ? "A-A"
+    : "A-B"
+}
+
+Requirements:
+1st Half: 6 plays
+2nd Half: ${secondHalfTarget} plays
+
+--------------------------------
+
+PLAYER SNAP COUNTS
+
+`;
+
+
+  players.forEach(p => {
+
+    const firstHalf =
+      p.q1 + p.q2;
+
+    const secondHalf =
+      p.q3 + p.q4;
+
+
+    const firstStatus =
+      firstHalf >= 6
+        ? "MET"
+        : "NOT MET";
+
+
+    const secondStatus =
+      secondHalf >= secondHalfTarget
+        ? "MET"
+        : "NOT MET";
+
+
+    report +=
+
+`#${p.num} ${p.name}
+Q1: ${p.q1}
+Q2: ${p.q2}
+Q3: ${p.q3}
+Q4: ${p.q4}
+1st Half: ${firstHalf} (${firstStatus})
+2nd Half: ${secondHalf} (${secondStatus})
+Total Game Snaps: ${firstHalf + secondHalf}
+
+--------------------------------
+
+`;
+
+  });
+
+
+  const subject =
+    encodeURIComponent(
+      "Football Snap Count Game Report"
+    );
+
+
+  const body =
+    encodeURIComponent(report);
+
+
+  window.location.href =
+    `mailto:?subject=${subject}&body=${body}`;
+
+}
+
+
+/* -----------------------------
+   RESET GAME
+----------------------------- */
+
+function resetAll() {
+
+  if (
+    confirm(
+      "Are you sure you want to reset all play counts to zero? This will erase the saved game."
+    )
+  ) {
+
+    players.forEach(p => {
+
+      p.onField = false;
+      p.q1 = 0;
+      p.q2 = 0;
+      p.q3 = 0;
+      p.q4 = 0;
+
+    });
+
+
+    document
+      .getElementById("quarterSelect")
+      .value = "Q1";
+
+
+    localStorage.removeItem(
+      "footballSnapTracker"
+    );
+
+
+    document.getElementById("saveStatus").innerText =
+      "New game started";
+
+
+    render();
+
+  }
+
+}
+
+
+init();
+
 </script>
+
 </body>
 </html>
